@@ -1,7 +1,7 @@
 [project]
 name = "billing-cli"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI learning with MUSE"
 readme = "README.md"
 authors = [
     { name = "Ajith Kumar Anumolu", email = "ajith@primasolv.com" }

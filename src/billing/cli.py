@@ -1,11 +1,11 @@
-import csv
-from collections.abc import Iterable
+import csv, sys, argparse
+from collections.abc import Iterator
 
 from .summarize import summarize_spend
 from .models import SpendRow
 
 
-def read_billing_rows(file_path: str) -> Iterable[SpendRow]:
+def read_billing_rows(file_path: str) -> Iterator[SpendRow]:
 
     with open(file_path, "r", newline='', encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -15,22 +15,34 @@ def read_billing_rows(file_path: str) -> Iterable[SpendRow]:
             raise ValueError(f"Missing columns: expected {sorted(expected)}, found {sorted(found)}")
 
         for line_number, row in enumerate(reader, start=2):
-            service = str.strip(row["service"])
+            service = row["service"].strip()
             raw_cost = row["cost"]
+
+            if service is None:
+                raise ValueError(
+                    f"CSV line {line_number}: missing 'service' field"
+                )
+
+            if raw_cost is None:
+                raise ValueError(
+                    f"CSV line {line_number}: missing 'cost' field"
+                )
 
             try:
                 cost = float(raw_cost)
-                yield SpendRow(service, cost)
             except ValueError:
-                raise ValueError(
-                    f"Row {line_number}: invalid cost value {raw_cost!r}"
-                ) from None
-
-import sys
+                raise ValueError(f"Row {line_number}: invalid cost value {raw_cost!r}") from None
+            try:
+                yield SpendRow(service, cost)
+            except ValueError as e:
+                raise ValueError(f"Row {line_number}: {e}") from None
 
 def main():
     try:
-        rows = read_billing_rows(sys.argv[1])
+        parser = argparse.ArgumentParser(description="Summarize AWS billing CSV by service")
+        parser.add_argument("csv_path")
+        args = parser.parse_args()
+        rows = read_billing_rows(args.csv_path)
         totals = summarize_spend(rows)
         print(totals)
     except (FileNotFoundError, ValueError) as error:
