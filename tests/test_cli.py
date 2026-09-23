@@ -1,21 +1,24 @@
 import csv
-import sys
 import re
+import sys
 
 import pytest
 
-from billing.cli import read_billing_rows, main
+from billing.cli import main, read_billing_rows
+
 
 def test_main_prints_spend_summary(tmp_path, monkeypatch, capsys):
     test_file = tmp_path / "billing.csv"
 
     with test_file.open("w", newline="", encoding="utf-8") as file:
-        csv.writer(file).writerows([
-            ["service", "cost"],
-            ["Amazon EC2", "12.00"],
-            ["Amazon S3", "3.25"],
-            ["Amazon EC2", "2.00"],
-        ])
+        csv.writer(file).writerows(
+            [
+                ["service", "cost"],
+                ["Amazon EC2", "12.00"],
+                ["Amazon S3", "3.25"],
+                ["Amazon EC2", "2.00"],
+            ]
+        )
 
     monkeypatch.setattr(
         sys,
@@ -27,10 +30,9 @@ def test_main_prints_spend_summary(tmp_path, monkeypatch, capsys):
 
     captured = capsys.readouterr()
 
-    assert captured.out == (
-        "{'Amazon EC2': 14.0, 'Amazon S3': 3.25}\n"
-    )
+    assert captured.out == ("{'Amazon EC2': 14.0, 'Amazon S3': 3.25}\n")
     assert captured.err == ""
+
 
 def test_main_prints_file_error_and_exits_one(tmp_path, monkeypatch, capsys):
     missing_file = tmp_path / "does-not-exist.csv"
@@ -52,6 +54,7 @@ def test_main_prints_file_error_and_exits_one(tmp_path, monkeypatch, capsys):
     assert captured.err.startswith("Error: [Errno 2]")
     assert str(missing_file) in captured.err
 
+
 def test_main_prints_validation_error_and_exits_one(
     tmp_path,
     monkeypatch,
@@ -59,8 +62,7 @@ def test_main_prints_validation_error_and_exits_one(
 ):
     test_file = tmp_path / "bad_billing.csv"
     test_file.write_text(
-        "service,cost\n"
-        "Amazon EC2,not-a-number\n",
+        "service,cost\nAmazon EC2,not-a-number\n",
         encoding="utf-8",
     )
 
@@ -78,9 +80,8 @@ def test_main_prints_validation_error_and_exits_one(
     captured = capsys.readouterr()
 
     assert captured.out == ""
-    assert captured.err == (
-        "Error: Row 2: invalid cost value 'not-a-number'\n"
-    )
+    assert captured.err == ("Error: Row 2: invalid cost value 'not-a-number'\n")
+
 
 def test_read_billing_rows_missing_column(tmp_path):
     test_file = tmp_path / "test.csv"
@@ -136,6 +137,7 @@ def test_read_billing_rows_wraps_empty_service_validation_error(tmp_path):
     expected_message = "Row 2: service must be non-empty"
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         list(read_billing_rows(test_file))
+
 
 def test_read_billing_rows_missing_cost_value_validation_error(tmp_path):
     test_file = tmp_path / "none_cost.csv"

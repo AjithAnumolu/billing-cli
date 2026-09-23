@@ -27,6 +27,6 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["billing-cli"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib"]
