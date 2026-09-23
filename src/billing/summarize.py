@@ -1,5 +1,7 @@
 from collections.abc import Iterator
+
 from .models import SpendRow
+
 
 def summarize_spend(rows: Iterator[SpendRow]) -> dict[str, float]:
     totals: dict[str, float] = {}
