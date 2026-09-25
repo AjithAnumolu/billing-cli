@@ -30,7 +30,9 @@ def test_main_prints_spend_summary(tmp_path, monkeypatch, capsys):
 
     captured = capsys.readouterr()
 
-    assert captured.out == ("{'Amazon EC2': 14.0, 'Amazon S3': 3.25}\n")
+    assert captured.out == (
+        "{'Amazon EC2': 14.0, 'Amazon S3': 3.25}\nTotal: $17.25 across 2 services\n"
+    )
     assert captured.err == ""
 
 
@@ -81,6 +83,153 @@ def test_main_prints_validation_error_and_exits_one(
 
     assert captured.out == ""
     assert captured.err == ("Error: Row 2: invalid cost value 'not-a-number'\n")
+
+
+def test_main_prints_topN_list(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    test_file = tmp_path / "topN.csv"
+    with test_file.open("w", newline="", encoding="utf-8") as file:
+        csv.writer(file).writerows(
+            [
+                ["service", "cost"],
+                ["Amazon EC2", "12.50"],
+                ["Amazon S3", "3.25"],
+                ["AWS Lambda", "0.75"],
+                ["Amazon EC2", "1.75"],
+                ["Amazon RDS", "8.40"],
+                ["Amazon S3", "0.60"],
+                ["AWS CloudWatch", "2.15"],
+                ["Amazon EC2", "1.20"],
+                ["Amazon S3", "3.00"],
+                ["  Amazon S3  ", "9.00"],
+            ]
+        )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["billing-summary", str(test_file), "--top", "2"],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+
+    assert captured.out == (
+        "{'Amazon S3': 15.85, 'Amazon EC2': 15.45}\nTotal: $42.60 across 5 services\n"
+    )
+    assert captured.err == ""
+
+
+def test_main_prints_topN_not_greater_than_zero(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    test_file = tmp_path / "topN.csv"
+    with test_file.open("w", newline="", encoding="utf-8") as file:
+        csv.writer(file).writerows(
+            [
+                ["service", "cost"],
+                ["Amazon EC2", "12.50"],
+                ["Amazon S3", "3.25"],
+                ["AWS Lambda", "0.75"],
+                ["Amazon EC2", "1.75"],
+                ["Amazon RDS", "8.40"],
+                ["Amazon S3", "0.60"],
+                ["AWS CloudWatch", "2.15"],
+                ["Amazon EC2", "1.20"],
+                ["Amazon S3", "3.00"],
+                ["  Amazon S3  ", "9.00"],
+            ]
+        )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["billing-summary", str(test_file), "--top", 0],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == (f"Error: --top must be a positive integer; received {0}\n")
+
+
+def test_main_prints_topN_must_be_an_integer(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    test_file = tmp_path / "topN.csv"
+    with test_file.open("w", newline="", encoding="utf-8") as file:
+        csv.writer(file).writerows(
+            [
+                ["service", "cost"],
+                ["Amazon EC2", "12.50"],
+                ["Amazon S3", "3.25"],
+                ["AWS Lambda", "0.75"],
+                ["Amazon EC2", "1.75"],
+                ["Amazon RDS", "8.40"],
+                ["Amazon S3", "0.60"],
+                ["AWS CloudWatch", "2.15"],
+                ["Amazon EC2", "1.20"],
+                ["Amazon S3", "3.00"],
+                ["  Amazon S3  ", "9.00"],
+            ]
+        )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cli", str(test_file), "--top", "abc"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 2
+
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == (
+        "usage: cli [-h] [--top N] csv_path\ncli: error: argument --top: invalid int value: 'abc'\n"
+    )
+
+
+def test_main_empty_rows_validation_error(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    test_file = tmp_path / "emptyrows.csv"
+    with test_file.open("w", newline="", encoding="utf-8") as file:
+        csv.writer(file).writerows([["service", "cost"]])
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cli", str(test_file), "--top", "2"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert captured.err == (f"Error: No data rows in {test_file}\n")
 
 
 def test_read_billing_rows_missing_column(tmp_path):
