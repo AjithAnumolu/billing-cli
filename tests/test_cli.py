@@ -82,7 +82,9 @@ def test_main_prints_validation_error_and_exits_one(
     captured = capsys.readouterr()
 
     assert captured.out == ""
-    assert captured.err == ("Error: Row 2: invalid cost value 'not-a-number'\n")
+    assert captured.err == (
+        "Error: CSV line 2: cost: Input should be a valid number, unable to parse string as a number\n"
+    )
 
 
 def test_main_prints_topN_list(
@@ -257,7 +259,7 @@ def test_read_billing_rows_bad_cost(tmp_path):
         csv.writer(f).writerows(data)
 
     assert test_file.exists()
-    expected_message = "Row 2: invalid cost value 'not-a-number'"
+    expected_message = "CSV line 2: cost: Input should be a valid number, unable to parse string as a number"
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         list(read_billing_rows(test_file))
 
@@ -270,7 +272,7 @@ def test_read_billing_rows_wraps_negative_cost_validation_error(tmp_path):
         csv.writer(f).writerows(data)
 
     assert test_file.exists()
-    expected_message = "Row 2: cost must be >= 0"
+    expected_message = "CSV line 2: cost: Value error, cost must be >= 0"
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         list(read_billing_rows(test_file))
 
@@ -283,7 +285,7 @@ def test_read_billing_rows_wraps_empty_service_validation_error(tmp_path):
         csv.writer(f).writerows(data)
 
     assert test_file.exists()
-    expected_message = "Row 2: service must be non-empty"
+    expected_message = "CSV line 2: service: Value error, service must be non-empty; cost: Value error, cost must be >= 0"
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         list(read_billing_rows(test_file))
 
@@ -296,6 +298,6 @@ def test_read_billing_rows_missing_cost_value_validation_error(tmp_path):
         csv.writer(f).writerows(data)
 
     assert test_file.exists()
-    expected_message = "CSV line 2: missing 'cost' field"
+    expected_message = "CSV line 2: cost: Input should be a valid number"
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         list(read_billing_rows(test_file))

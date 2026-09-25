@@ -3,7 +3,9 @@ import csv
 import sys
 from collections.abc import Iterator
 
-from .models import SpendRow
+from pydantic import ValidationError
+
+from .pydantic_example import SpendRow
 from .summarize import summarize_spend
 
 
@@ -19,24 +21,19 @@ def read_billing_rows(file_path: str) -> Iterator[SpendRow]:
             )
 
         for line_number, row in enumerate(reader, start=2):
-            raw_service = row["service"]
-            raw_cost = row["cost"]
-
-            if raw_cost is None or not raw_cost.strip():
-                raise ValueError(f"CSV line {line_number}: missing 'cost' field")
-
-            service = raw_service.strip()
-
             try:
-                cost = float(raw_cost)
-            except ValueError:
-                raise ValueError(
-                    f"Row {line_number}: invalid cost value {raw_cost!r}"
-                ) from None
-            try:
-                yield SpendRow(service, cost)
-            except ValueError as e:
-                raise ValueError(f"Row {line_number}: {e}") from None
+                yield SpendRow.model_validate(
+                    {
+                        "service": row.get("service"),
+                        "cost": row.get("cost"),
+                    }
+                )
+            except ValidationError as exc:
+                errors = "; ".join(
+                    f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                    for error in exc.errors()
+                )
+                raise ValueError(f"CSV line {line_number}: {errors}") from None
 
 
 def main():
