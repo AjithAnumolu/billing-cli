@@ -1,13 +1,21 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, field_validator
 
 
-@dataclass(frozen=True)
-class SpendRow:
+class SpendRow(BaseModel):
     service: str
     cost: float
 
-    def __post_init__(self):
-        if not self.service.strip():
+    @field_validator("service")
+    @classmethod
+    def service_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
             raise ValueError("service must be non-empty")
-        if self.cost < 0:
+        return value
+
+    @field_validator("cost")
+    @classmethod
+    def cost_should_be_greater_than_or_equal_to_zero(cls, value: float) -> float:
+        if value < 0.00:
             raise ValueError("cost must be >= 0")
+        return value

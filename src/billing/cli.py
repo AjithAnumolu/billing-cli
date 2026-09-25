@@ -5,7 +5,7 @@ from collections.abc import Iterator
 
 from pydantic import ValidationError
 
-from .pydantic_example import SpendRow
+from .models import SpendRow
 from .summarize import summarize_spend
 
 
