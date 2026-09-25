@@ -13,29 +13,18 @@ service,cost
 - Repeated services are combined.
 - Ties are ordered alphabetically by service name.
 
-## Prerequisites
-
-- Python 3.10 or later.
-- [`uv`](https://docs.astral.sh/uv/) installed.
-
-This project has no third-party runtime dependencies, but `uv` provides a repeatable way to create and run inside a virtual environment.
-
 ## Setup
 
-From the directory that contains the package directory (the directory holding `cli.py`, `summarize.py`, and `models.py`):
+From the repository root, install the project environment and dependencies:
 
 ```bash
-uv venv
+uv sync
 ```
 
-Activate the environment:
+Run the command-line application with:
 
 ```bash
-# macOS/Linux
-source .venv/bin/activate
-
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
+uv run billing <csv-path>
 ```
 
 Create a sample input file named `billing.csv`:
@@ -48,14 +37,12 @@ Amazon EC2,7.50
 AWS Lambda,1.20
 ```
 
-> Replace `your_package` in the commands below with the package directory name that contains `cli.py`. For example, if the files are in `billing_summary/cli.py`, use `python -m billing_summary.cli`.
-
 ## Commands
 
 ### 1. Happy path: show every service
 
 ```bash
-uv run python -m your_package.cli billing.csv
+uv run billing billing.csv
 ```
 
 Expected stdout:
@@ -70,7 +57,7 @@ Expected exit code: `0`.
 ### 2. Show only the top 2 services
 
 ```bash
-uv run python -m your_package.cli billing.csv --top 2
+uv run billing billing.csv --top 2
 ```
 
 Expected stdout:
@@ -97,7 +84,7 @@ Amazon S3,not-a-number
 Run:
 
 ```bash
-uv run python -m your_package.cli bad-billing.csv
+uv run billing bad-billing.csv
 ```
 
 Expected stderr:
@@ -114,7 +101,7 @@ You can verify the exit code immediately after running the command:
 
 ```bash
 # macOS/Linux
- echo $?
+echo $?
 
 # Windows PowerShell
 $LASTEXITCODE
