@@ -1,10 +1,30 @@
 import csv
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from billing.models import SpendRow
+
+# Make src/ importable when pytest is run from the project root.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+sys.path.insert(0, str(SRC_DIR))
+
+from api.main import app
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def valid_csv_bytes() -> bytes:
+    return b"service,cost\nAmazon S3,3.25\nAmazon EC2,10.00\nAmazon EC2,2.50\n"
 
 
 def _write_csv(tmp_path: Path, filename: str, rows: list[list[object]]) -> Path:

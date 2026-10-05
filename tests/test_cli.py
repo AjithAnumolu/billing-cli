@@ -93,7 +93,7 @@ def test_main_prints_top_n_list(
     captured = capsys.readouterr()
 
     assert captured.out == (
-        "{'Amazon S3': 15.85, 'Amazon EC2': 15.45}\nTotal: $42.60 across 5 services\n"
+        "{'Amazon S3': 15.85, 'Amazon EC2': 15.45}\nTotal: $31.30 across 2 services\n"
     )
     assert captured.err == ""
 

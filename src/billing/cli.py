@@ -62,13 +62,14 @@ def main():
             raise ValueError(f"No data rows in {args.csv_path}")
 
         if args.top is None:
-            print(totals)
+            displayed = totals
         else:
-            print(dict(list(totals.items())[: args.top]))
+            displayed = dict(list(totals.items())[: args.top])
 
-        grand_total = sum(totals.values())
-        service_count = len(totals)
+        print(displayed)
 
+        grand_total = sum(displayed.values())
+        service_count = len(displayed)
         print(f"Total: ${grand_total:.2f} across {service_count} services")
 
     except (FileNotFoundError, ValueError) as error:
