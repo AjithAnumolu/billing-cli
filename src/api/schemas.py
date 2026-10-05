@@ -10,3 +10,4 @@ class BillingSummaryResponse(BaseModel):
     services: list[ServiceSpend]
     grand_total: float = Field(ge=0)
     service_count: int = Field(ge=0)
+    source_filename: str | None = None

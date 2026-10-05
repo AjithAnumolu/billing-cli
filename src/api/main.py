@@ -4,6 +4,7 @@ import codecs
 import csv
 import io
 from collections.abc import AsyncIterator
+from pathlib import Path, PureWindowsPath
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
@@ -133,6 +134,12 @@ def as_http_error(error: BillingCsvError) -> HTTPException:
     )
 
 
+def sanitize_filename(filename: str | None) -> str | None:
+    if filename is None:
+        return None
+    return Path(PureWindowsPath(filename).name).name
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -141,12 +148,19 @@ async def healthz() -> dict[str, str]:
 @app.post("/v1/billing/summarize", response_model=BillingSummaryResponse)
 async def summarize_billing_csv(
     file: Annotated[
-        UploadFile, File(description="UTF-8 billing CSV with service and cost columns")
+        UploadFile,
+        File(description="UTF-8 billing CSV with service and cost columns"),
     ],
     top: Annotated[
-        int | None, Query(gt=0, description="Return only the top N services")
+        int | None,
+        Query(gt=0, description="Return only the top N services"),
     ] = None,
 ) -> BillingSummaryResponse:
+    if file.filename is None:  # pragma: no cover
+        source_filename = None
+    else:
+        source_filename = sanitize_filename(file.filename)
+
     try:
         rows = await parse_billing_csv(file)
     except BillingCsvError as exc:
@@ -162,4 +176,5 @@ async def summarize_billing_csv(
         services=services,
         grand_total=sum(item.cost for item in services),
         service_count=len(services),
+        source_filename=source_filename,
     )
