@@ -11,6 +11,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -80,6 +81,39 @@ async def add_request_id(request: Request, call_next):
             extra={"request_fields": fields},
             exc_info=exception_info,
         )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_request_validation_error(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    request_id = request.state.request_id
+    request.state.error_code = "request_validation_error"
+
+    errors = [
+        {
+            "type": error["type"],
+            "loc": list(error["loc"]),
+            "message": error["msg"],
+        }
+        for error in exc.errors()
+    ]
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "request_validation_error",
+                "message": "Request validation failed.",
+                "details": {
+                    "request_id": request_id,
+                    "errors": errors,
+                },
+            }
+        },
+        headers={"X-Request-ID": request_id},
+    )
 
 
 @app.exception_handler(Exception)

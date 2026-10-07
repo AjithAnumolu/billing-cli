@@ -18,7 +18,10 @@ def test_healthz_has_request_id(client):
     response = client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "ok",
+        "request_id": response.headers["X-Request-ID"],
+    }
     assert_uuid4(response.headers["X-Request-ID"])
 
 
@@ -99,15 +102,53 @@ def test_internal_error_correlates_response_and_traceback(
 
 
 @pytest.mark.parametrize("top", ["0", "-1", "1.5", "not-a-number"])
-def test_invalid_top_is_fastapi_422(client, valid_csv_bytes, top):
+def test_invalid_top_returns_validation_envelope(
+    client,
+    valid_csv_bytes,
+    top,
+):
     response = client.post(
         f"/v1/billing/summarize?top={top}",
-        files={"file": ("billing.csv", valid_csv_bytes, "text/csv")},
+        files={
+            "file": ("billing.csv", valid_csv_bytes, "text/csv"),
+        },
     )
 
     assert response.status_code == 422
-    error = response.json()["detail"][0]
-    assert error["loc"] == ["query", "top"]
+
+    error = response.json()["error"]
+    assert error["code"] == "request_validation_error"
+    assert error["message"] == "Request validation failed."
+
+    details = error["details"]
+    assert details["request_id"] == response.headers["X-Request-ID"]
+    assert_uuid4(details["request_id"])
+    assert details["errors"][0]["loc"] == ["query", "top"]
+
+
+def test_missing_file_returns_validation_envelope(client, caplog):
+    with caplog.at_level(logging.WARNING, logger="api.main"):
+        response = client.post("/v1/billing/summarize")
+
+    assert response.status_code == 422
+
+    error = response.json()["error"]
+    assert error["code"] == "request_validation_error"
+
+    details = error["details"]
+    assert details["request_id"] == response.headers["X-Request-ID"]
+    assert_uuid4(details["request_id"])
+    assert any(
+        item["loc"] == ["body", "file"] and item["type"] == "missing"
+        for item in details["errors"]
+    )
+
+    record = request_record(caplog, response)
+    assert record.levelno == logging.WARNING
+    assert record.request_fields["status_code"] == 422
+    assert record.request_fields["error_code"] == "request_validation_error"
+    assert record.request_fields["rows_parsed"] == 0
+    assert record.request_fields["source_filename"] is None
 
 
 def test_top_is_optional_and_limits_ranked_results(client, valid_csv_bytes):
