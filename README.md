@@ -1,16 +1,10 @@
 # AWS Billing CSV Summarizer
-[
-![](C:\Users\ajith\Downloads\badge.svg)
-](https://github.com/AjithAnumolu/billing-cli/actions/workflows/ci.yml)
 
-**
+[![CI](https://github.com/AjithAnumolu/billing-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/AjithAnumolu/billing-cli/actions/workflows/ci.yml)
 
-```markdown
 A CLI and a FastAPI service that read a CSV of AWS service costs, aggregate spend by service, and return services from highest to lowest spend with the grand total.
 
-
 The input CSV must include these columns:
-```
 ```csv
 service,cost
 ```
@@ -34,10 +28,10 @@ cd billing-cli
 uv sync
 uv run pytest                                   # 44 tests
 uv run uvicorn api.main:app --port 8000         # API on http://localhost:8000
-
+```
 
 ## Setup
-```
+
 From the repository root, install the project environment and dependencies:
 
 ```bash
@@ -258,25 +252,49 @@ billing: error: argument --top: invalid int value: 'abc'
 
 This exits with code `2`.
 
-```markdown
 ## API
 
 ### `GET /healthz`
-
-```
 
 ```json
 { "status": "ok", "request_id": "3f6b2a1e-9c4d-4e8a-b5f1-2d7c0a9e6f31" }
 ```
 
-```markdown
-## Docker
+The same request ID is returned in the `X-Request-ID` response header.
+
+### `POST /v1/billing/summarize`
+
+Upload the CSV as `multipart/form-data` with field `file`. Optional query param `top` limits the displayed rows.
+
+```bash
+curl -X POST "http://localhost:8000/v1/billing/summarize?top=2" \
+  -F "file=@billing.csv"
 ```
+
+```json
+{
+  "services": [
+    { "service": "Amazon EC2", "cost": 17.0 },
+    { "service": "Amazon S3", "cost": 3.25 }
+  ],
+  "grand_total": 20.25,
+  "service_count": 2,
+  "source_filename": "billing.csv"
+}
+```
+
+Errors use one envelope, `{"error": {"code", "message", "details"}}`, with the request ID in `details`. Codes: `missing_required_columns`, `empty_csv`, `malformed_csv`, `invalid_text_encoding` (400); `file_too_large` (413, 10 MiB limit); `invalid_csv_row` and `request_validation_error` (422); `internal_error` (500, traceback in the server log only). An invalid row fails the whole request — never a partial summary.
+
+Note: unlike the CLI, the API's `grand_total` and `service_count` are scoped to the `top` rows displayed, not the whole file.
+
+## Docker
 
 ```bash
 docker build -t billing-api:local .
 docker run -d --name billing --restart unless-stopped -p 8000:8000 billing-api:local
 ```
+
+Image: 290 MB on disk, 73.5 MB of content (the rest is the shared `python:3.12-slim` base). Multi-stage build with uv layer caching, non-root `appuser`, and a urllib-based `HEALTHCHECK` on `/healthz` (the slim image has no curl). Restart policy is `--restart unless-stopped`; the drill is killing the process inside the container (`docker exec billing sh -c 'kill -9 1'`) — `docker kill` is treated as an explicit stop and never triggers a restart.
 
 ## Exit codes
 
@@ -312,10 +330,11 @@ Service names are normalized by trimming surrounding whitespace before aggregati
 
 The program aggregates all valid billing rows before applying `--top`. Therefore, limiting displayed services does not change the grand total or the number of distinct services.
 
-```markdown
 ## Tests and CI
-```
+
 ```bash
 uv run pytest                  # 44 tests
 uv run ruff check . && uv run ruff format --check .
 ```
+
+GitHub Actions runs lint, tests (`--cov=billing --cov-fail-under=100`), and a Docker build on every push and pull request.
