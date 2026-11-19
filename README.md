@@ -1,9 +1,16 @@
 # AWS Billing CSV Summarizer
+[
+![](C:\Users\ajith\Downloads\badge.svg)
+](https://github.com/AjithAnumolu/billing-cli/actions/workflows/ci.yml)
 
-A command-line program that reads a CSV of AWS service costs, aggregates spend by service, displays services from highest to lowest spend, and prints the grand total.
+**
+
+```markdown
+A CLI and a FastAPI service that read a CSV of AWS service costs, aggregate spend by service, and return services from highest to lowest spend with the grand total.
+
 
 The input CSV must include these columns:
-
+```
 ```csv
 service,cost
 ```
@@ -19,8 +26,18 @@ The application:
 - Uses alphabetical service-name ordering to break equal-cost ties.
 - Prints the overall total and count of distinct services, even when `--top` limits the displayed services.
 
-## Setup
+## Quickstart
 
+```bash
+git clone https://github.com/AjithAnumolu/billing-cli
+cd billing-cli
+uv sync
+uv run pytest                                   # 44 tests
+uv run uvicorn api.main:app --port 8000         # API on http://localhost:8000
+
+
+## Setup
+```
 From the repository root, install the project environment and dependencies:
 
 ```bash
@@ -241,6 +258,26 @@ billing: error: argument --top: invalid int value: 'abc'
 
 This exits with code `2`.
 
+```markdown
+## API
+
+### `GET /healthz`
+
+```
+
+```json
+{ "status": "ok", "request_id": "3f6b2a1e-9c4d-4e8a-b5f1-2d7c0a9e6f31" }
+```
+
+```markdown
+## Docker
+```
+
+```bash
+docker build -t billing-api:local .
+docker run -d --name billing --restart unless-stopped -p 8000:8000 billing-api:local
+```
+
 ## Exit codes
 
 | Situation | Output stream | Exit code |
@@ -274,3 +311,11 @@ Service names are normalized by trimming surrounding whitespace before aggregati
 ### Keep totals independent of `--top`
 
 The program aggregates all valid billing rows before applying `--top`. Therefore, limiting displayed services does not change the grand total or the number of distinct services.
+
+```markdown
+## Tests and CI
+```
+```bash
+uv run pytest                  # 44 tests
+uv run ruff check . && uv run ruff format --check .
+```

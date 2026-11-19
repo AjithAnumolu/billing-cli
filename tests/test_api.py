@@ -1,11 +1,14 @@
+import csv
 import json
 import logging
 from uuid import UUID
 
 import pytest
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-from api.main import MAX_UPLOAD_BYTES, app
+from api.main import MAX_UPLOAD_BYTES, add_request_id, app, sanitize_filename
 
 
 def assert_uuid4(value: str) -> None:
@@ -499,3 +502,72 @@ def test_json_formatter_outputs_one_line_with_traceback():
     assert payload["request_id"] == "test-id"
     assert payload["status_code"] == 500
     assert "RuntimeError: simulated failure" in payload["traceback"]
+
+
+def test_middleware_sets_fallback_error_code_for_bare_422(caplog):
+    test_app = FastAPI()
+    test_app.middleware("http")(add_request_id)
+
+    @test_app.get("/bare-422")
+    async def bare_422():
+        return JSONResponse({"message": "Rejected"}, status_code=422)
+
+    with (
+        caplog.at_level(logging.WARNING, logger="api.main"),
+        TestClient(test_app) as client,
+    ):
+        response = client.get("/bare-422")
+
+    assert response.status_code == 422
+    assert_uuid4(response.headers["X-Request-ID"])
+    record = request_record(caplog, response)
+    assert record.levelno == logging.WARNING
+    assert record.request_fields["error_code"] == "request_validation_error"
+
+
+def test_rejects_incomplete_utf8_sequence_at_eof(client):
+    response = client.post(
+        "/v1/billing/summarize",
+        files={
+            "file": (
+                "truncated.csv",
+                b"service,cost\nAmazon S3,3.25\n\xe2\x82",
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    error = response.json()["detail"]["error"]
+    assert error["code"] == "invalid_text_encoding"
+    assert error["details"]["expected_encoding"] == "utf-8"
+    assert error["details"]["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_csv_parser_error_returns_malformed_csv(client):
+    # Force a real csv.Error without relying on the host's field-size limit.
+    previous_limit = csv.field_size_limit(32)
+    try:
+        response = client.post(
+            "/v1/billing/summarize",
+            files={
+                "file": (
+                    "oversized-field.csv",
+                    b"service,cost\n" + b"A" * 33 + b",3.25\n",
+                    "text/csv",
+                )
+            },
+        )
+    finally:
+        csv.field_size_limit(previous_limit)
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == {
+        "code": "malformed_csv",
+        "message": "CSV could not be parsed.",
+        "details": {"request_id": response.headers["X-Request-ID"]},
+    }
+
+
+def test_sanitize_filename_accepts_none():
+    assert sanitize_filename(None) is None
